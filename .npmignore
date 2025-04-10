@@ -1,0 +1,8 @@
+node_modules
+src
+vite.config.ts
+tsconfig.json
+.eslintrc.js
+.prettierrc
+.vscode
+.vscode-test

@@ -30,7 +30,19 @@ export default [
       commonjs(),
       typescript({ tsconfig: "./tsconfig.json" }),
       terser(),
-      postcss(),
+      postcss({
+        extract: true,
+        minimize: true,
+        modules: false,
+      }),
+      {
+        onwarn(warning, warn) {
+          if (warning.code === "MODULE_LEVEL_DIRECTIVE") {
+            return;
+          }
+          warn(warning);
+        },
+      },
     ],
     external: ["react", "react-dom"],
   },

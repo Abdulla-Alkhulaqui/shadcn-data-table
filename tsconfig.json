@@ -6,7 +6,7 @@
     "emitDeclarationOnly": false,
     "outDir": "dist",
     "module": "ESNext",
-    "target": "ES5",
+    "target": "ES2020",
     "moduleResolution": "Node",
     "jsx": "react-jsx",
     "esModuleInterop": true,
@@ -18,7 +18,7 @@
     "noFallthroughCasesInSwitch": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
+    "noEmit": false,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "paths": {

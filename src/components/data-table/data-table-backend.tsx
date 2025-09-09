@@ -58,13 +58,6 @@ export function BackendDataTable<TData, TValue>({
   renderToolbar,
   initialPageSize = 25,
 }: BackendDataTableProps<TData, TValue>) {
-  // Debug: Log when component renders
-  console.log('🔄 BackendDataTable render:', { 
-    loading, 
-    dataLength: data.length, 
-    totalCount,
-    columnsLength: columns.length
-  });
   const [columnVisibility, setColumnVisibility] = React.useState({});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -119,7 +112,6 @@ export function BackendDataTable<TData, TValue>({
 
   // Effect to trigger data fetching when table state changes
   React.useEffect(() => {
-    console.log('🔄 BackendDataTable calling onDataChange');
     if (onDataChangeRef.current) {
       onDataChangeRef.current({
         page: pagination.pageIndex + 1, // Convert to 1-based
@@ -136,35 +128,30 @@ export function BackendDataTable<TData, TValue>({
     // onDataChange removed from dependencies to prevent circular calls
   ]);
 
-
   // Get stable header groups - these shouldn't change unless columns change
   const headerGroups = table.getHeaderGroups();
 
   // Memoized table header that only changes when columns change
-  const stableTableHeader = React.useMemo(
-    () => {
-      console.log('🏗️ Header re-render');
-      return (
-        <TableHeader>
-          {headerGroups.map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id} colSpan={header.colSpan}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-      );
-    },
-    [columns]
-  );
+  const stableTableHeader = React.useMemo(() => {
+    return (
+      <TableHeader>
+        {headerGroups.map((headerGroup) => (
+          <TableRow key={headerGroup.id}>
+            {headerGroup.headers.map((header) => (
+              <TableHead key={header.id} colSpan={header.colSpan}>
+                {header.isPlaceholder
+                  ? null
+                  : flexRender(
+                      header.column.columnDef.header,
+                      header.getContext()
+                    )}
+              </TableHead>
+            ))}
+          </TableRow>
+        ))}
+      </TableHeader>
+    );
+  }, [columns]);
 
   // Separate memoized component for just the table body content
   // This is the ONLY component that should re-render when data/loading changes
@@ -175,7 +162,6 @@ export function BackendDataTable<TData, TValue>({
     pageSize: number;
   }>(
     ({ loading, rows, columns, pageSize }) => {
-      console.log('📊 TableBody re-render:', { loading, rowCount: rows.length });
       if (loading) {
         return (
           <>
@@ -235,13 +221,14 @@ export function BackendDataTable<TData, TValue>({
   const pageCount = table.getPageCount();
 
   // Memoized pagination that only updates when pagination actually changes
-  const stablePagination = React.useMemo(
-    () => {
-      console.log('📄 Pagination re-render');
-      return <DataTablePagination table={table} totalCount={totalCount} />;
-    },
-    [paginationState.pageIndex, paginationState.pageSize, pageCount, totalCount]
-  );
+  const stablePagination = React.useMemo(() => {
+    return <DataTablePagination table={table} totalCount={totalCount} />;
+  }, [
+    paginationState.pageIndex,
+    paginationState.pageSize,
+    pageCount,
+    totalCount,
+  ]);
 
   return (
     <div className="flex flex-col gap-4">

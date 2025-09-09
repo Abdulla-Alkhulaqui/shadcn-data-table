@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { Table } from "@tanstack/react-table";
 import { X } from "lucide-react";
 
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataTableViewOptions } from "./data-table-view-options";
 import { DataTableFacetedFilter } from "./data-table-faceted-filter";
+import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
 
 export interface FacetedFilterConfig<TData> {
   column: string; // column id
@@ -37,18 +39,38 @@ export function DataTableToolbar<TData>({
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0;
 
+  // Use uncontrolled input with ref to avoid React state issues
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Initialize input value from table filter on mount
+  React.useEffect(() => {
+    if (searchColumn && searchInputRef.current) {
+      const initialValue = (table.getColumn(searchColumn)?.getFilterValue() as string) ?? "";
+      searchInputRef.current.value = initialValue;
+    }
+  }, [searchColumn]);
+
+  // Debounced callback to update table filter
+  const debouncedSetFilter = useDebouncedCallback((value: string) => {
+    if (searchColumn) {
+      table.getColumn(searchColumn)?.setFilterValue(value);
+    }
+  }, 300);
+
+  // Handle search input changes using native input events
+  const handleSearchChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    debouncedSetFilter(value); // Only update table filter, let input handle its own value
+  }, [debouncedSetFilter]);
+
   return (
     <div className="flex items-center justify-between">
       <div className="flex flex-1 items-center gap-2">
         {searchColumn && (
           <Input
+            ref={searchInputRef}
             placeholder={searchPlaceholder}
-            value={
-              (table.getColumn(searchColumn)?.getFilterValue() as string) ?? ""
-            }
-            onChange={(event) =>
-              table.getColumn(searchColumn)?.setFilterValue(event.target.value)
-            }
+            onChange={handleSearchChange}
             className="h-8 w-[250px] lg:w-[250px]"
           />
         )}

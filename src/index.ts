@@ -14,6 +14,7 @@ export { DataTableRowActions } from "./components/data-table/data-table-row-acti
 
 // Hooks
 export { useDataTable } from "./hooks/use-data-table";
+export { useDebouncedCallback } from "./hooks/use-debounced-callback";
 
 // Types
 export type {

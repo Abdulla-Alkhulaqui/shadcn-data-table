@@ -6,16 +6,21 @@ import {
   ColumnFiltersState,
   flexRender,
   getCoreRowModel,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
   SortingState,
   useReactTable,
   VisibilityState,
   Table as ReactTableInstance,
 } from "@tanstack/react-table";
+
+import { 
+  DEFAULT_CLIENT_TABLE_CONFIG, 
+  createInitialTableState 
+} from "@/lib/table-helpers";
 
 import {
   Table,
@@ -44,14 +49,11 @@ export function DataTable<TData, TValue>({
   renderToolbar,
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({});
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  );
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = React.useState<SortingState>([]);
 
-  const table = useReactTable({
+  const table = useReactTable<TData>({
     data,
     columns,
     state: {
@@ -60,22 +62,18 @@ export function DataTable<TData, TValue>({
       rowSelection,
       columnFilters,
     },
-    initialState: {
-      pagination: {
-        pageSize: 25,
-      },
-    },
+    initialState: createInitialTableState(),
     enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
+    onRowSelectionChange: setRowSelection,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
   });
 
   return (

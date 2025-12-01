@@ -27,6 +27,7 @@ interface DataTableToolbarProps<TData> {
   facetedFilters?: FacetedFilterConfig<TData>[]; // list of filters
   addButtonLabel?: string; // optional "Add" button
   onAddClick?: () => void;
+  refetch?: () => void; // optional refetch function
 }
 
 export function DataTableToolbar<TData>({
@@ -36,6 +37,7 @@ export function DataTableToolbar<TData>({
   facetedFilters = [],
   addButtonLabel,
   onAddClick,
+  refetch,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0;
 
@@ -45,7 +47,8 @@ export function DataTableToolbar<TData>({
   // Initialize input value from table filter on mount
   React.useEffect(() => {
     if (searchColumn && searchInputRef.current) {
-      const initialValue = (table.getColumn(searchColumn)?.getFilterValue() as string) ?? "";
+      const initialValue =
+        (table.getColumn(searchColumn)?.getFilterValue() as string) ?? "";
       searchInputRef.current.value = initialValue;
     }
   }, [searchColumn]);
@@ -58,10 +61,13 @@ export function DataTableToolbar<TData>({
   }, 300);
 
   // Handle search input changes using native input events
-  const handleSearchChange = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    debouncedSetFilter(value); // Only update table filter, let input handle its own value
-  }, [debouncedSetFilter]);
+  const handleSearchChange = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const value = event.target.value;
+      debouncedSetFilter(value); // Only update table filter, let input handle its own value
+    },
+    [debouncedSetFilter]
+  );
 
   return (
     <div className="flex items-center justify-between">

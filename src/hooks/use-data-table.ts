@@ -31,13 +31,9 @@ import * as React from "react";
 
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
 import { getSortingStateParser } from "@/lib/parsers";
+import { QUERY_KEYS, SEPARATORS, DEBOUNCE } from "@/lib/constants";
 import type { ExtendedColumnSort } from "@/types/data-table";
 
-const PAGE_KEY = "page";
-const PER_PAGE_KEY = "perPage";
-const SORT_KEY = "sort";
-const ARRAY_SEPARATOR = ",";
-const DEBOUNCE_MS = 300;
 const THROTTLE_MS = 50;
 
 interface UseDataTableProps<TData>
@@ -70,7 +66,7 @@ export function useDataTable<TData>(props: UseDataTableProps<TData>) {
     pageCount = -1,
     initialState,
     history = "replace",
-    debounceMs = DEBOUNCE_MS,
+    debounceMs = DEBOUNCE.DEFAULT_MS,
     throttleMs = THROTTLE_MS,
     clearOnDefault = false,
     enableAdvancedFilter = false,
@@ -110,11 +106,11 @@ export function useDataTable<TData>(props: UseDataTableProps<TData>) {
     React.useState<VisibilityState>(initialState?.columnVisibility ?? {});
 
   const [page, setPage] = useQueryState(
-    PAGE_KEY,
+    QUERY_KEYS.PAGE,
     parseAsInteger.withOptions(queryStateOptions).withDefault(1),
   );
   const [perPage, setPerPage] = useQueryState(
-    PER_PAGE_KEY,
+    QUERY_KEYS.PER_PAGE,
     parseAsInteger
       .withOptions(queryStateOptions)
       .withDefault(initialState?.pagination?.pageSize ?? 10),
@@ -148,7 +144,7 @@ export function useDataTable<TData>(props: UseDataTableProps<TData>) {
   }, [columns]);
 
   const [sorting, setSorting] = useQueryState(
-    SORT_KEY,
+    QUERY_KEYS.SORT,
     getSortingStateParser<TData>(columnIds)
       .withOptions(queryStateOptions)
       .withDefault(initialState?.sorting ?? []),
@@ -181,7 +177,7 @@ export function useDataTable<TData>(props: UseDataTableProps<TData>) {
       if (column.meta?.options) {
         acc[column.id ?? ""] = parseAsArrayOf(
           parseAsString,
-          ARRAY_SEPARATOR,
+          SEPARATORS.ARRAY,
         ).withOptions(queryStateOptions);
       } else {
         acc[column.id ?? ""] = parseAsString.withOptions(queryStateOptions);

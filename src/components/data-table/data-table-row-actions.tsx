@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { Row } from "@tanstack/react-table";
 import { MoreHorizontal } from "lucide-react";
 
@@ -42,8 +43,10 @@ export function DataTableRowActions<TData>({
   actions = [],
   submenus = [],
 }: DataTableRowActionsProps<TData>) {
+  const [open, setOpen] = React.useState(false);
+
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -58,7 +61,10 @@ export function DataTableRowActions<TData>({
         {actions.map((action, idx) => (
           <DropdownMenuItem
             key={idx}
-            onClick={() => action.onClick?.(row)}
+            onClick={() => {
+              setOpen(false);
+              action.onClick?.(row);
+            }}
             className={action.variant === "destructive" ? "text-red-600" : ""}
           >
             {action.label}
@@ -81,7 +87,10 @@ export function DataTableRowActions<TData>({
                   <DropdownMenuRadioItem
                     key={opt.value}
                     value={opt.value}
-                    onClick={() => submenu.onSelect?.(row, opt.value)}
+                    onClick={() => {
+                      setOpen(false);
+                      submenu.onSelect?.(row, opt.value);
+                    }}
                   >
                     {opt.label}
                   </DropdownMenuRadioItem>

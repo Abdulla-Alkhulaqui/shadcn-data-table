@@ -10,6 +10,11 @@ import {
 } from "@tanstack/react-table";
 
 import {
+  DEFAULT_BACKEND_TABLE_CONFIG,
+  createInitialTableState,
+} from "@/lib/table-helpers";
+
+import {
   Table,
   TableBody,
   TableCell,
@@ -21,11 +26,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { DataTablePagination } from "./data-table-pagination";
-import {
-  useReactTable,
-  getCoreRowModel,
-  getPaginationRowModel,
-} from "@tanstack/react-table";
+import { useReactTable } from "@tanstack/react-table";
 
 export interface BackendDataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -40,13 +41,20 @@ export interface BackendDataTableProps<TData, TValue> {
   }) => void;
   /**
    * Optional toolbar renderer —
-   * receives the table instance so you can build custom toolbars.
+   * receives the table instance and optional refetch function so you can build custom toolbars.
    */
-  renderToolbar?: (table: ReactTableInstance<TData>) => React.ReactNode;
+  renderToolbar?: (
+    table: ReactTableInstance<TData>,
+    refetch?: () => void
+  ) => React.ReactNode;
   /**
    * Initial page size (defaults to 25)
    */
   initialPageSize?: number;
+  /**
+   * Optional refetch function to pass to the toolbar
+   */
+  refetch?: () => void;
 }
 
 export function BackendDataTable<TData, TValue>({
@@ -57,6 +65,7 @@ export function BackendDataTable<TData, TValue>({
   onDataChange,
   renderToolbar,
   initialPageSize = 25,
+  refetch,
 }: BackendDataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] = React.useState({});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -68,188 +77,124 @@ export function BackendDataTable<TData, TValue>({
     pageSize: initialPageSize,
   });
 
-  // Stable event handlers that don't change on re-renders
-  const stableHandlers = React.useMemo(
-    () => ({
-      onSortingChange: setSorting,
-      onColumnFiltersChange: setColumnFilters,
-      onColumnVisibilityChange: setColumnVisibility,
-      onPaginationChange: setPagination,
-    }),
-    []
-  );
-
-  // Stable table configuration - only recreate if columns change
-  const stableTableOptions = React.useMemo(
-    () => ({
-      columns,
-      getCoreRowModel: getCoreRowModel(),
-      getPaginationRowModel: getPaginationRowModel(),
-      manualPagination: true,
-      manualSorting: true,
-      manualFiltering: true,
-      ...stableHandlers,
-    }),
-    [columns, stableHandlers]
-  );
-
-  // Create table instance with stable config
-  const table = useReactTable({
-    ...stableTableOptions,
-    data, // This can change without recreating table
+  const table = useReactTable<TData>({
+    data,
+    columns,
     pageCount: Math.ceil(totalCount / pagination.pageSize),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onPaginationChange: setPagination,
     state: {
       sorting,
       columnVisibility,
       columnFilters,
       pagination,
     },
+    ...DEFAULT_BACKEND_TABLE_CONFIG,
   });
 
-  // Use ref to store latest onDataChange to avoid including it in dependencies
-  const onDataChangeRef = React.useRef(onDataChange);
-  onDataChangeRef.current = onDataChange;
+  const prevParams = React.useRef({
+    page: 1,
+    pageSize: initialPageSize,
+    sorting: [] as SortingState,
+    filters: [] as ColumnFiltersState,
+  });
 
-  // Effect to trigger data fetching when table state changes
   React.useEffect(() => {
-    if (onDataChangeRef.current) {
-      onDataChangeRef.current({
+    if (onDataChange) {
+      const newParams = {
         page: pagination.pageIndex + 1, // Convert to 1-based
         pageSize: pagination.pageSize,
         sorting,
         filters: columnFilters,
-      });
+      };
+
+      // Only call onDataChange if the params have actually changed
+      if (
+        prevParams.current.page !== newParams.page ||
+        prevParams.current.pageSize !== newParams.pageSize ||
+        JSON.stringify(prevParams.current.sorting) !== JSON.stringify(newParams.sorting) ||
+        JSON.stringify(prevParams.current.filters) !== JSON.stringify(newParams.filters)
+      ) {
+        prevParams.current = newParams;
+        onDataChange(newParams);
+      }
     }
   }, [
     pagination.pageIndex,
     pagination.pageSize,
     sorting,
     columnFilters,
-    // onDataChange removed from dependencies to prevent circular calls
-  ]);
-
-  // Get stable header groups - these shouldn't change unless columns change
-  const headerGroups = table.getHeaderGroups();
-
-  // Memoized table header that only changes when columns change
-  const stableTableHeader = React.useMemo(() => {
-    return (
-      <TableHeader>
-        {headerGroups.map((headerGroup) => (
-          <TableRow key={headerGroup.id}>
-            {headerGroup.headers.map((header) => (
-              <TableHead key={header.id} colSpan={header.colSpan}>
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )}
-              </TableHead>
-            ))}
-          </TableRow>
-        ))}
-      </TableHeader>
-    );
-  }, [columns]);
-
-  // Separate memoized component for just the table body content
-  // This is the ONLY component that should re-render when data/loading changes
-  const TableBodyContent = React.memo<{
-    loading: boolean;
-    rows: any[];
-    columns: any[];
-    pageSize: number;
-  }>(
-    ({ loading, rows, columns, pageSize }) => {
-      if (loading) {
-        return (
-          <>
-            {Array.from({ length: pageSize }, (_, index) => (
-              <TableRow key={`skeleton-${index}`}>
-                {columns.map((_, cellIndex) => (
-                  <TableCell key={`skeleton-cell-${cellIndex}`}>
-                    <Skeleton className="h-4 w-full" />
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </>
-        );
-      }
-
-      if (rows?.length) {
-        return (
-          <>
-            {rows.map((row) => (
-              <TableRow
-                key={row.id}
-                data-state={row.getIsSelected() && "selected"}
-              >
-                {row.getVisibleCells().map((cell: any) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </>
-        );
-      }
-
-      return (
-        <TableRow>
-          <TableCell colSpan={columns.length} className="h-24 text-center">
-            No results.
-          </TableCell>
-        </TableRow>
-      );
-    },
-    (prevProps, nextProps) => {
-      // Custom comparison: only re-render if loading state or actual row data changes
-      return (
-        prevProps.loading === nextProps.loading &&
-        prevProps.rows === nextProps.rows &&
-        prevProps.pageSize === nextProps.pageSize &&
-        prevProps.columns.length === nextProps.columns.length
-      );
-    }
-  );
-
-  // Create stable pagination props to prevent unnecessary re-renders
-  const paginationState = table.getState().pagination;
-  const pageCount = table.getPageCount();
-
-  // Memoized pagination that only updates when pagination actually changes
-  const stablePagination = React.useMemo(() => {
-    return <DataTablePagination table={table} totalCount={totalCount} />;
-  }, [
-    paginationState.pageIndex,
-    paginationState.pageSize,
-    pageCount,
-    totalCount,
+    onDataChange,
   ]);
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Render toolbar only if provided */}
-      {renderToolbar && renderToolbar(table)}
+      {/* Render toolbar only if provided - always render regardless of loading state */}
+      {renderToolbar && renderToolbar(table, refetch)}
 
       <div className="rounded-md border">
         <Table>
-          {stableTableHeader}
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id} colSpan={header.colSpan}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
           <TableBody>
-            <TableBodyContent
-              loading={loading}
-              rows={table.getRowModel().rows}
-              columns={columns}
-              pageSize={pagination.pageSize}
-            />
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  className={loading ? "opacity-50" : ""}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : loading ? (
+              Array.from({ length: pagination.pageSize }, (_, index) => (
+                <TableRow key={`skeleton-${index}`}>
+                  {columns.map((_, cellIndex) => (
+                    <TableCell key={`skeleton-cell-${cellIndex}`}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  No results.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
 
-      {stablePagination}
+      <DataTablePagination table={table} totalCount={totalCount} />
     </div>
   );
 }

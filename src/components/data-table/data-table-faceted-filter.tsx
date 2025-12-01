@@ -37,7 +37,8 @@ export function DataTableFacetedFilter<TData, TValue>({
   options,
 }: DataTableFacetedFilterProps<TData, TValue>) {
   const facets = column?.getFacetedUniqueValues();
-  const selectedValues = new Set(column?.getFilterValue() as string[]);
+  const filterValue = column?.getFilterValue() as string[] | undefined;
+  const selectedValues = React.useMemo(() => new Set(filterValue || []), [filterValue]);
 
   return (
     <Popover>

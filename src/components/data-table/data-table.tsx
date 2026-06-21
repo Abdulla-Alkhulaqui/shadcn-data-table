@@ -1,27 +1,7 @@
-"use client";
+import { flexRender, type Table as TanstackTable } from "@tanstack/react-table";
+import type * as React from "react";
 
-import * as React from "react";
-import {
-  ColumnDef,
-  ColumnFiltersState,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
-  SortingState,
-  useReactTable,
-  VisibilityState,
-  Table as ReactTableInstance,
-} from "@tanstack/react-table";
-
-import { 
-  DEFAULT_CLIENT_TABLE_CONFIG, 
-  createInitialTableState 
-} from "@/lib/table-helpers";
-
+import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import {
   Table,
   TableBody,
@@ -30,69 +10,45 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getColumnPinningStyle } from "@/lib/data-table";
+import { cn } from "@/lib/utils";
 
-import { DataTablePagination } from "./data-table-pagination";
-
-export interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[];
-  data: TData[];
-  /**
-   * Optional toolbar renderer —
-   * receives the table instance so you can build custom toolbars.
-   */
-  renderToolbar?: (table: ReactTableInstance<TData>) => React.ReactNode;
+export interface DataTableProps<TData> extends React.ComponentProps<"div"> {
+  table: TanstackTable<TData>;
+  actionBar?: React.ReactNode;
 }
 
-export function DataTable<TData, TValue>({
-  columns,
-  data,
-  renderToolbar,
-}: DataTableProps<TData, TValue>) {
-  const [rowSelection, setRowSelection] = React.useState({});
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-
-  const table = useReactTable<TData>({
-    data,
-    columns,
-    state: {
-      sorting,
-      columnVisibility,
-      rowSelection,
-      columnFilters,
-    },
-    initialState: createInitialTableState(),
-    enableRowSelection: true,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-    onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
-  });
-
+export function DataTable<TData>({
+  table,
+  actionBar,
+  children,
+  className,
+  ...props
+}: DataTableProps<TData>) {
   return (
-    <div className="flex flex-col gap-4">
-      {/* 🔹 Render toolbar only if provided */}
-      {renderToolbar && renderToolbar(table)}
-
+    <div
+      className={cn("flex w-full flex-col gap-2.5 overflow-auto", className)}
+      {...props}
+    >
+      {children}
       <div className="overflow-hidden rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} colSpan={header.colSpan}>
+                  <TableHead
+                    key={header.id}
+                    colSpan={header.colSpan}
+                    style={{
+                      ...getColumnPinningStyle({ column: header.column }),
+                    }}
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(
                           header.column.columnDef.header,
-                          header.getContext()
+                          header.getContext(),
                         )}
                   </TableHead>
                 ))}
@@ -107,10 +63,15 @@ export function DataTable<TData, TValue>({
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      style={{
+                        ...getColumnPinningStyle({ column: cell.column }),
+                      }}
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </TableCell>
                   ))}
@@ -119,7 +80,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={table.getAllColumns().length}
                   className="h-24 text-center"
                 >
                   No results.
@@ -129,8 +90,12 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-
-      <DataTablePagination table={table} />
+      <div className="flex flex-col gap-2.5">
+        <DataTablePagination table={table} />
+        {actionBar &&
+          table.getFilteredSelectedRowModel().rows.length > 0 &&
+          actionBar}
+      </div>
     </div>
   );
 }

@@ -1,11 +1,7 @@
-/**
- * Common constants used throughout the data table package
- */
-
 export const PAGINATION = {
   DEFAULT_PAGE_SIZE: 25,
   DEFAULT_PAGE_INDEX: 0,
-  PAGE_SIZE_OPTIONS: [10, 20, 25, 30, 40, 50],
+  PAGE_SIZE_OPTIONS: [10, 20, 30, 40, 50],
 } as const;
 
 export const DEBOUNCE = {
@@ -21,8 +17,10 @@ export const TABLE = {
 
 export const QUERY_KEYS = {
   PAGE: "page",
-  PER_PAGE: "perPage", 
+  PER_PAGE: "perPage",
   SORT: "sort",
+  FILTERS: "filters",
+  JOIN_OPERATOR: "joinOperator",
 } as const;
 
 export const SEPARATORS = {

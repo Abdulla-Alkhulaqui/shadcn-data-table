@@ -8,6 +8,8 @@ import {
   getFacetedMinMaxValues,
 } from "@tanstack/react-table";
 
+import type { TableState } from "@tanstack/react-table";
+
 import { PAGINATION } from "./constants";
 
 /**
@@ -34,6 +36,7 @@ export const DEFAULT_CLIENT_TABLE_CONFIG = {
   getSortedRowModel: TABLE_ROW_MODELS.sorted,
   getFacetedRowModel: TABLE_ROW_MODELS.facetedRow,
   getFacetedUniqueValues: TABLE_ROW_MODELS.facetedUniqueValues,
+  getFacetedMinMaxValues: TABLE_ROW_MODELS.facetedMinMaxValues,
 } as const;
 
 /**
@@ -41,7 +44,6 @@ export const DEFAULT_CLIENT_TABLE_CONFIG = {
  */
 export const DEFAULT_BACKEND_TABLE_CONFIG = {
   getCoreRowModel: TABLE_ROW_MODELS.core,
-  getPaginationRowModel: TABLE_ROW_MODELS.pagination,
   manualPagination: true,
   manualSorting: true,
   manualFiltering: true,
@@ -58,7 +60,7 @@ export const DEFAULT_PAGINATION = {
 /**
  * Common table state initialization
  */
-export const createInitialTableState = (overrides?: Partial<any>) => ({
+export const createInitialTableState = (overrides?: Partial<TableState>) => ({
   pagination: DEFAULT_PAGINATION,
   rowSelection: {},
   columnVisibility: {},

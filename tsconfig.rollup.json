@@ -1,11 +1,5 @@
 {
   "compilerOptions": {
-    "composite": true,
-    "declaration": true,
-    "declarationDir": "dist",
-    "emitDeclarationOnly": false,
-    "outDir": "dist",
-    "tsBuildInfoFile": ".tsbuildinfo",
     "module": "ESNext",
     "target": "ES2020",
     "moduleResolution": "Node",

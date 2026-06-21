@@ -5,48 +5,46 @@ import {
   ColumnDef,
   SortingState,
   ColumnFiltersState,
+  Table as ReactTableInstance,
 } from "@tanstack/react-table";
 
 import { BackendDataTable } from "./data-table-backend";
 import {
+  DataTableToolbar,
+} from "./data-table-toolbar";
+import {
   useBackendTable,
   UseBackendTableConfig,
+  BackendTableMeta,
 } from "../../hooks/use-backend-table";
-import {
-  createInitialTableState,
-  DEFAULT_PAGINATION,
-} from "../../lib/table-helpers";
+import { DEFAULT_PAGINATION } from "../../lib/table-helpers";
+import type { DataTableClasses } from "./data-table-types";
 
 export interface ApiDataTableProps<TData, TValue>
   extends Omit<UseBackendTableConfig<TData>, "initialData" | "initialMeta"> {
-  /** Column definitions */
   columns: ColumnDef<TData, TValue>[];
-  /** Optional toolbar renderer */
-  renderToolbar?: (table: any, refetch?: () => void) => React.ReactNode;
-  /** Initial page size */
+  classes?: DataTableClasses<TData>;
+  renderToolbar?: (
+    table: ReactTableInstance<TData>,
+    refetch?: () => void
+  ) => React.ReactNode;
   initialPageSize?: number;
-  /** Initial data while loading */
   initialData?: TData[];
-  /** Custom loading component */
+  initialMeta?: BackendTableMeta;
   loadingComponent?: React.ReactNode;
-  /** Custom error component */
   errorComponent?: (error: string, refetch: () => void) => React.ReactNode;
-  /** Callback when data changes (for external state management) */
   onDataChange?: (data: { data: TData[]; meta: any }) => void;
-  /** Callback to provide refetch function to parent component */
   onRefetchReady?: (refetch: () => void) => void;
 }
 
-/**
- * High-level API-connected data table component
- * Handles all backend communication automatically
- */
 export function ApiDataTable<TData, TValue>({
   columns,
+  classes,
   endpoint,
   renderToolbar,
   initialPageSize = DEFAULT_PAGINATION.pageSize,
   initialData = [],
+  initialMeta,
   loadingComponent,
   errorComponent,
   onDataChange,
@@ -57,6 +55,8 @@ export function ApiDataTable<TData, TValue>({
   fetchOptions,
   customFetch,
   enabled = true,
+  responseAdapter,
+  loadingDelayMs,
 }: ApiDataTableProps<TData, TValue>) {
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(initialPageSize);
@@ -74,24 +74,27 @@ export function ApiDataTable<TData, TValue>({
       customFetch,
       enabled,
       initialData,
+      initialMeta,
+      responseAdapter,
+      loadingDelayMs,
     }
   );
 
-  // Notify parent of data changes
   React.useEffect(() => {
     if (onDataChange) {
       onDataChange({ data, meta });
     }
   }, [data, meta, onDataChange]);
 
-  // Provide refetch function to parent
   React.useEffect(() => {
     if (onRefetchReady) {
       onRefetchReady(refetch);
     }
   }, [onRefetchReady, refetch]);
 
-  // Handle data change from table
+  const paramsRef = React.useRef({ page, pageSize, sorting, filters });
+  paramsRef.current = { page, pageSize, sorting, filters };
+
   const handleDataChange = React.useCallback(
     ({
       page: newPage,
@@ -104,21 +107,21 @@ export function ApiDataTable<TData, TValue>({
       sorting: SortingState;
       filters: ColumnFiltersState;
     }) => {
-      // Only update if values have actually changed to prevent infinite loops
-      if (newPage !== page) setPage(newPage);
-      if (newPageSize !== pageSize) setPageSize(newPageSize);
-      if (JSON.stringify(newSorting) !== JSON.stringify(sorting)) setSorting(newSorting);
-      if (JSON.stringify(newFilters) !== JSON.stringify(filters)) setFilters(newFilters);
+      const prev = paramsRef.current;
+      if (newPage !== prev.page) setPage(newPage);
+      if (newPageSize !== prev.pageSize) setPageSize(newPageSize);
+      if (JSON.stringify(newSorting) !== JSON.stringify(prev.sorting))
+        setSorting(newSorting);
+      if (JSON.stringify(newFilters) !== JSON.stringify(prev.filters))
+        setFilters(newFilters);
     },
-    [page, pageSize, sorting, filters]
+    [setPage, setPageSize, setSorting, setFilters]
   );
 
-  // Custom error display
   if (error && errorComponent) {
     return <>{errorComponent(error, refetch)}</>;
   }
 
-  // Default error display
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
@@ -136,6 +139,16 @@ export function ApiDataTable<TData, TValue>({
     );
   }
 
+  if (loading && data.length === 0 && loadingComponent) {
+    return <>{loadingComponent}</>;
+  }
+
+  const toolbarRenderer =
+    renderToolbar ??
+    ((table: ReactTableInstance<TData>) => (
+      <DataTableToolbar table={table} />
+    ));
+
   return (
     <BackendDataTable
       data={data}
@@ -143,9 +156,10 @@ export function ApiDataTable<TData, TValue>({
       totalCount={meta.total}
       loading={loading}
       onDataChange={handleDataChange}
-      renderToolbar={renderToolbar}
+      renderToolbar={toolbarRenderer}
       initialPageSize={initialPageSize}
       refetch={refetch}
+      classes={classes}
     />
   );
 }

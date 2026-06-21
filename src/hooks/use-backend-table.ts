@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { SortingState, ColumnFiltersState } from "@tanstack/react-table";
 
+const EMPTY_FETCH_OPTIONS: RequestInit = {};
+
 export interface BackendTableMeta {
   page: number;
   pageSize: number;
@@ -13,6 +15,15 @@ export interface BackendTableMeta {
 export interface BackendTableResponse<TData = any> {
   data: TData[];
   meta: BackendTableMeta;
+}
+
+export interface FlatBackendTableResponse<TData = any> {
+  data: TData[];
+  total: number;
+  page?: number;
+  perPage?: number;
+  pageSize?: number;
+  totalPages?: number;
 }
 
 export interface UseBackendTableParams {
@@ -41,6 +52,55 @@ export interface UseBackendTableConfig<TData = any> {
   initialData?: TData[];
   /** Initial meta */
   initialMeta?: BackendTableMeta;
+  /** Adapt common API response shapes into the package's canonical shape */
+  responseAdapter?:
+    | "meta"
+    | "flat"
+    | ((response: unknown, params: UseBackendTableParams) => BackendTableResponse<TData>);
+  /** Delay before setting loading=true, useful to avoid flicker */
+  loadingDelayMs?: number;
+}
+
+function toRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function normalizeResponse<TData>(
+  response: unknown,
+  params: UseBackendTableParams,
+  adapter: UseBackendTableConfig<TData>["responseAdapter"],
+): BackendTableResponse<TData> {
+  if (typeof adapter === "function") {
+    return adapter(response, params);
+  }
+
+  const record = toRecord(response);
+  if (adapter === "flat") {
+    const pageSize = Number(record.perPage ?? record.pageSize ?? params.pageSize);
+    const total = Number(record.total ?? 0);
+    return {
+      data: Array.isArray(record.data) ? (record.data as TData[]) : [],
+      meta: {
+        page: Number(record.page ?? params.page),
+        pageSize,
+        total,
+        totalPages: Number(
+          record.totalPages ?? Math.ceil(total / Math.max(pageSize, 1)),
+        ),
+      },
+    };
+  }
+
+  const meta = toRecord(record.meta);
+  return {
+    data: Array.isArray(record.data) ? (record.data as TData[]) : [],
+    meta: {
+      page: Number(meta.page ?? params.page),
+      pageSize: Number(meta.pageSize ?? params.pageSize),
+      total: Number(meta.total ?? 0),
+      totalPages: Number(meta.totalPages ?? 0),
+    },
+  };
 }
 
 /**
@@ -56,7 +116,7 @@ export function useBackendTable<TData = any>(
     transformFilters,
     transformSorting,
     transformParams,
-    fetchOptions = {},
+    fetchOptions = EMPTY_FETCH_OPTIONS,
     customFetch,
     enabled = true,
     initialData = [],
@@ -65,24 +125,31 @@ export function useBackendTable<TData = any>(
       pageSize: 10,
       total: 0,
       totalPages: 0,
-    }
+    },
+    responseAdapter = "meta",
+    loadingDelayMs = 100,
   } = config;
 
   const [data, setData] = useState<TData[]>(initialData);
   const [meta, setMeta] = useState<BackendTableMeta>(initialMeta);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const paramsRef = useRef(params);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Create stable serialized versions of complex params to avoid infinite loops
-  const paramsKey = useMemo(() => {
-    return JSON.stringify({
+  const stableParams = useMemo(
+    () => ({
       page: params.page,
       pageSize: params.pageSize,
       sorting: params.sorting,
-      filters: params.filters
-    });
-  }, [params.page, params.pageSize, params.sorting, params.filters]);
+      filters: params.filters,
+    }),
+    [params.page, params.pageSize, params.sorting, params.filters],
+  );
+
+  useEffect(() => {
+    paramsRef.current = stableParams;
+  }, [stableParams]);
 
   // Build URL parameters - memoized to prevent infinite loops
   const buildParams = useCallback((tableParams: UseBackendTableParams) => {
@@ -133,10 +200,13 @@ export function useBackendTable<TData = any>(
   // Fetch data
   const fetchData = useCallback(async (
     tableParams: UseBackendTableParams,
-    abortController?: AbortController
+    abortController?: AbortController,
+    showLoading = true,
   ) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       setError(null);
 
       const urlParams = buildParams(tableParams);
@@ -144,19 +214,24 @@ export function useBackendTable<TData = any>(
 
       const response = customFetch 
         ? await customFetch(url, {
-            signal: abortController?.signal,
             ...fetchOptions,
+            signal: fetchOptions.signal ?? abortController?.signal,
           })
         : await fetch(url, {
-            signal: abortController?.signal,
             ...fetchOptions,
+            signal: fetchOptions.signal ?? abortController?.signal,
           });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch data: ${response.statusText}`);
       }
 
-      const result: BackendTableResponse<TData> = await response.json();
+      const rawResult = await response.json();
+      const result = normalizeResponse<TData>(
+        rawResult,
+        tableParams,
+        responseAdapter,
+      );
 
       // Only update if not aborted
       if (!abortController?.signal.aborted) {
@@ -174,13 +249,11 @@ export function useBackendTable<TData = any>(
       }
       console.error("Backend table fetch error:", err);
     }
-  }, [endpoint, customFetch, fetchOptions, buildParams]);
+  }, [endpoint, customFetch, fetchOptions, buildParams, responseAdapter]);
 
-  // Effect for automatic data fetching
-  useEffect(() => {
-    // console.log('useBackendTable: Effect triggered', params, config);
-    
-    if (!enabled) return;
+	// Effect for automatic data fetching
+	useEffect(() => {
+		if (!enabled) return;
 
     const abortController = new AbortController();
     
@@ -194,102 +267,14 @@ export function useBackendTable<TData = any>(
     loadingTimeoutRef.current = setTimeout(() => {
       setLoading(true);
       loadingTimeoutRef.current = null;
-    }, 100);
+    }, loadingDelayMs);
 
-    // Inline fetch to avoid circular dependency
-    const fetchDataInline = async () => {
-      try {
-        setError(null);
-
-        const urlParams = new URLSearchParams({
-          page: params.page.toString(),
-          perPage: params.pageSize.toString(),
-        });
-
-        // Handle sorting
-        if (params.sorting.length > 0) {
-          if (transformSorting) {
-            const sortingParams = transformSorting(params.sorting);
-            Object.entries(sortingParams).forEach(([key, value]) => {
-              urlParams.append(key, value);
-            });
-          } else {
-            // Default sorting format: "field.direction"
-            const sort = params.sorting
-              .map((s) => `${s.id}.${s.desc ? "desc" : "asc"}`)
-              .join(",");
-            urlParams.append("sort", sort);
-          }
-        }
-
-        // Handle filters
-        if (transformFilters) {
-          const filterParams = transformFilters(params.filters);
-          Object.entries(filterParams).forEach(([key, value]) => {
-            urlParams.append(key, value);
-          });
-        } else {
-          // Default filter handling
-          params.filters.forEach((filter) => {
-            if (filter.value) {
-              if (Array.isArray(filter.value)) {
-                urlParams.append(filter.id, filter.value.join(","));
-              } else {
-                urlParams.append(filter.id, filter.value as string);
-              }
-            }
-          });
-        }
-
-        // Apply custom parameter transformation
-        const finalParams = transformParams ? transformParams(urlParams) : urlParams;
-        const url = `${endpoint}?${finalParams.toString()}`;
-
-        const response = customFetch 
-          ? await customFetch(url, {
-              signal: abortController?.signal,
-              ...fetchOptions,
-            })
-          : await fetch(url, {
-              signal: abortController?.signal,
-              ...fetchOptions,
-            });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch data: ${response.statusText}`);
-        }
-
-        const result: BackendTableResponse<TData> = await response.json();
-
-        // Only update if not aborted
-        if (!abortController?.signal.aborted) {
-          // Clear loading timeout if still pending
-          if (loadingTimeoutRef.current) {
-            clearTimeout(loadingTimeoutRef.current);
-            loadingTimeoutRef.current = null;
-          }
-          setData(result.data);
-          setMeta(result.meta);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
-          return;
-        }
-        if (!abortController?.signal.aborted) {
-          // Clear loading timeout if still pending
-          if (loadingTimeoutRef.current) {
-            clearTimeout(loadingTimeoutRef.current);
-            loadingTimeoutRef.current = null;
-          }
-          setError(err instanceof Error ? err.message : "Failed to fetch data");
-          setLoading(false);
-        }
-        console.error("Backend table fetch error:", err);
+    void fetchData(stableParams, abortController, false).finally(() => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
       }
-    };
-
-    fetchDataInline();
+    });
 
     return () => {
       abortController.abort();
@@ -299,12 +284,12 @@ export function useBackendTable<TData = any>(
         loadingTimeoutRef.current = null;
       }
     };
-  }, [paramsKey, enabled, endpoint]);
+  }, [stableParams, enabled, endpoint, fetchData, loadingDelayMs]);
 
   // Manual refetch function
   const refetch = useCallback(async () => {
-    await fetchData(params);
-  }, [fetchData, params]);
+    await fetchData(paramsRef.current);
+  }, [fetchData]);
 
   return {
     data,

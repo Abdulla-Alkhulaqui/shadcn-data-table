@@ -16,7 +16,7 @@ A comprehensive, flexible data table package built on top of TanStack Table and 
 ## Installation
 
 ```bash
-npm install @your-org/shadcn-data-table
+npm install shadcn-data-table
 ```
 
 ## Quick Start
@@ -24,7 +24,7 @@ npm install @your-org/shadcn-data-table
 ### Client-Side Data Table
 
 ```tsx
-import { DataTable, useDataTable, DataTableToolbar } from '@your-org/shadcn-data-table';
+import { DataTable, useDataTable, DataTableToolbar } from "shadcn-data-table";
 
 function ClientTable() {
   const data = [
@@ -62,7 +62,7 @@ function ClientTable() {
 ### Server-Side Data Table
 
 ```tsx
-import { BackendDataTable, DataTableToolbar } from '@your-org/shadcn-data-table';
+import { BackendDataTable, DataTableToolbar } from "shadcn-data-table";
 
 function ServerTable() {
   const [data, setData] = useState([]);

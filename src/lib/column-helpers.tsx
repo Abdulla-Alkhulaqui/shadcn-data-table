@@ -33,7 +33,7 @@ export function createTextColumn<TData>(
   return {
     accessorKey,
     header: enableSorting 
-      ? ({ column }) => <DataTableColumnHeader column={column} title={title} />
+      ? ({ column }) => <DataTableColumnHeader column={column} label={title} />
       : title,
     enableSorting,
     enableColumnFilter,
@@ -61,7 +61,7 @@ export function createStatusColumn<TData>(
 
   return {
     accessorKey,
-    header: ({ column }) => <DataTableColumnHeader column={column} title={title} />,
+    header: ({ column }) => <DataTableColumnHeader column={column} label={title} />,
     cell: ({ getValue }) => {
       const value = getValue() as string;
       const status = statusOptions.find((option) => option.value === value);
@@ -120,7 +120,7 @@ export function createDateColumn<TData>(
   return {
     accessorKey,
     header: enableSorting 
-      ? ({ column }) => <DataTableColumnHeader column={column} title={title} />
+      ? ({ column }) => <DataTableColumnHeader column={column} label={title} />
       : title,
     cell: ({ getValue }) => formatDate(getValue() as string),
     enableSorting,
@@ -202,7 +202,7 @@ export function createNumberColumn<TData>(
   return {
     accessorKey,
     header: enableSorting 
-      ? ({ column }) => <DataTableColumnHeader column={column} title={title} />
+      ? ({ column }) => <DataTableColumnHeader column={column} label={title} />
       : title,
     cell: cell 
       ? ({ getValue, row }) => cell(getValue() as number, row)
@@ -232,7 +232,7 @@ export function createBooleanColumn<TData>(
   return {
     accessorKey,
     header: enableSorting 
-      ? ({ column }) => <DataTableColumnHeader column={column} title={title} />
+      ? ({ column }) => <DataTableColumnHeader column={column} label={title} />
       : title,
     cell: ({ getValue }) => {
       const value = getValue() as boolean;
@@ -253,6 +253,71 @@ export function createBooleanColumn<TData>(
         { value: "true", label: trueLabel },
         { value: "false", label: falseLabel },
       ],
+    },
+  };
+}
+
+/**
+ * Create a multi-select column with options
+ */
+export function createMultiSelectColumn<TData>(
+  accessorKey: string,
+  title: string,
+  options: Array<{
+    value: string;
+    label: string;
+    icon?: any;
+  }>,
+  options2?: {
+    enableSorting?: boolean;
+    enableHiding?: boolean;
+  }
+): ColumnDef<TData> {
+  const { enableSorting = true, enableHiding = true } = options2 || {};
+
+  return {
+    accessorKey,
+    header: ({ column }) => <DataTableColumnHeader column={column} label={title} />,
+    cell: ({ getValue }) => {
+      const value = getValue() as string | string[];
+      const values = Array.isArray(value) ? value : [value];
+      const selected = options.filter((opt) => values.includes(opt.value));
+
+      return (
+        <div className="flex items-center gap-1.5">
+          {selected.length === 0 ? (
+            <span className="text-muted-foreground">—</span>
+          ) : selected.length > 2 ? (
+            <span className="text-muted-foreground text-xs">
+              {selected.length} selected
+            </span>
+          ) : (
+            selected.map((opt) => (
+              <span
+                key={opt.value}
+                className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium"
+              >
+                {opt.icon && <opt.icon className="size-3" />}
+                {opt.label}
+              </span>
+            ))
+          )}
+        </div>
+      );
+    },
+    filterFn: (row, id, value) => {
+      const cellValue = row.getValue(id) as string | string[];
+      const cellValues = Array.isArray(cellValue) ? cellValue : [cellValue];
+      const filterValues = Array.isArray(value) ? value : [value];
+      return filterValues.some((v: string) => cellValues.includes(v));
+    },
+    enableSorting,
+    enableColumnFilter: true,
+    enableHiding,
+    meta: {
+      variant: "multiSelect",
+      options,
+      label: title,
     },
   };
 }

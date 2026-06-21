@@ -9,10 +9,8 @@ import {
   ColumnFiltersState,
 } from "@tanstack/react-table";
 
-import {
-  DEFAULT_BACKEND_TABLE_CONFIG,
-  createInitialTableState,
-} from "@/lib/table-helpers";
+import { DEFAULT_BACKEND_TABLE_CONFIG } from "@/lib/table-helpers";
+import { cn } from "@/lib/utils";
 
 import {
   Table,
@@ -26,6 +24,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { DataTablePagination } from "./data-table-pagination";
+import type { DataTableClasses } from "./data-table-types";
 import { useReactTable } from "@tanstack/react-table";
 
 export interface BackendDataTableProps<TData, TValue> {
@@ -55,6 +54,7 @@ export interface BackendDataTableProps<TData, TValue> {
    * Optional refetch function to pass to the toolbar
    */
   refetch?: () => void;
+  classes?: DataTableClasses<TData>;
 }
 
 export function BackendDataTable<TData, TValue>({
@@ -66,6 +66,7 @@ export function BackendDataTable<TData, TValue>({
   renderToolbar,
   initialPageSize = 25,
   refetch,
+  classes,
 }: BackendDataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] = React.useState({});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -77,12 +78,28 @@ export function BackendDataTable<TData, TValue>({
     pageSize: initialPageSize,
   });
 
+  const handleSortingChange = React.useCallback(
+    (updater: React.SetStateAction<SortingState>) => {
+      setSorting(updater);
+      setPagination((current) => ({ ...current, pageIndex: 0 }));
+    },
+    []
+  );
+
+  const handleColumnFiltersChange = React.useCallback(
+    (updater: React.SetStateAction<ColumnFiltersState>) => {
+      setColumnFilters(updater);
+      setPagination((current) => ({ ...current, pageIndex: 0 }));
+    },
+    []
+  );
+
   const table = useReactTable<TData>({
     data,
     columns,
-    pageCount: Math.ceil(totalCount / pagination.pageSize),
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    pageCount: Math.max(Math.ceil(totalCount / Math.max(pagination.pageSize, 1)), 1),
+    onSortingChange: handleSortingChange,
+    onColumnFiltersChange: handleColumnFiltersChange,
     onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPagination,
     state: {
@@ -101,8 +118,11 @@ export function BackendDataTable<TData, TValue>({
     filters: [] as ColumnFiltersState,
   });
 
+  const onDataChangeRef = React.useRef(onDataChange);
+  onDataChangeRef.current = onDataChange;
+
   React.useEffect(() => {
-    if (onDataChange) {
+    if (onDataChangeRef.current) {
       const newParams = {
         page: pagination.pageIndex + 1, // Convert to 1-based
         pageSize: pagination.pageSize,
@@ -110,15 +130,15 @@ export function BackendDataTable<TData, TValue>({
         filters: columnFilters,
       };
 
-      // Only call onDataChange if the params have actually changed
+      const prev = prevParams.current;
       if (
-        prevParams.current.page !== newParams.page ||
-        prevParams.current.pageSize !== newParams.pageSize ||
-        JSON.stringify(prevParams.current.sorting) !== JSON.stringify(newParams.sorting) ||
-        JSON.stringify(prevParams.current.filters) !== JSON.stringify(newParams.filters)
+        prev.page !== newParams.page ||
+        prev.pageSize !== newParams.pageSize ||
+        prev.sorting !== newParams.sorting ||
+        JSON.stringify(prev.filters) !== JSON.stringify(newParams.filters)
       ) {
         prevParams.current = newParams;
-        onDataChange(newParams);
+        onDataChangeRef.current(newParams);
       }
     }
   }, [
@@ -126,21 +146,26 @@ export function BackendDataTable<TData, TValue>({
     pagination.pageSize,
     sorting,
     columnFilters,
-    onDataChange,
   ]);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={cn("flex flex-col gap-4", classes?.root)}>
       {/* Render toolbar only if provided - always render regardless of loading state */}
-      {renderToolbar && renderToolbar(table, refetch)}
+      {renderToolbar ? (
+        <div className={classes?.toolbar}>{renderToolbar(table, refetch)}</div>
+      ) : null}
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
+      <div className={cn("rounded-md border", classes?.tableWrapper)}>
+        <Table className={classes?.table}>
+          <TableHeader className={classes?.header}>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className={classes?.headerRow}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} colSpan={header.colSpan}>
+                  <TableHead
+                    key={header.id}
+                    colSpan={header.colSpan}
+                    className={classes?.headerCell}
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -152,16 +177,28 @@ export function BackendDataTable<TData, TValue>({
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody>
+          <TableBody className={classes?.body}>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className={loading ? "opacity-50" : ""}
+                  className={cn(
+                    loading ? "opacity-50" : "",
+                    typeof classes?.row === "function"
+                      ? classes.row(row)
+                      : classes?.row
+                  )}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      className={cn(
+                        typeof classes?.cell === "function"
+                          ? classes.cell(cell)
+                          : classes?.cell
+                      )}
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -172,19 +209,22 @@ export function BackendDataTable<TData, TValue>({
               ))
             ) : loading ? (
               Array.from({ length: pagination.pageSize }, (_, index) => (
-                <TableRow key={`skeleton-${index}`}>
+                <TableRow key={`skeleton-${pagination.pageIndex}-${pagination.pageSize}-${index}`} className={classes?.emptyRow}>
                   {columns.map((_, cellIndex) => (
-                    <TableCell key={`skeleton-cell-${cellIndex}`}>
+                    <TableCell
+                      key={`skeleton-cell-${cellIndex}`}
+                      className={classes?.emptyCell}
+                    >
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
-              <TableRow>
+              <TableRow className={classes?.emptyRow}>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className={cn("h-24 text-center", classes?.emptyCell)}
                 >
                   No results.
                 </TableCell>
@@ -194,7 +234,10 @@ export function BackendDataTable<TData, TValue>({
         </Table>
       </div>
 
-      <DataTablePagination table={table} totalCount={totalCount} />
+      <DataTablePagination
+        table={table}
+        className={classes?.pagination}
+      />
     </div>
   );
 }

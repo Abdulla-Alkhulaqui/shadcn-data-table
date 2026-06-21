@@ -6,9 +6,9 @@ export function formatDate(
 
   try {
     return new Intl.DateTimeFormat("en-US", {
-      month: opts.month ?? "long",
-      day: opts.day ?? "numeric",
-      year: opts.year ?? "numeric",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
       ...opts,
     }).format(new Date(date));
   } catch (_err) {

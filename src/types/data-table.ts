@@ -1,9 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 import type { ColumnSort, Row, RowData } from "@tanstack/react-table";
 import type { DataTableConfig } from "@/config/data-table";
 import type { FilterItemSchema } from "@/lib/parsers";
 
 declare module "@tanstack/react-table" {
-  // biome-ignore lint/correctness/noUnusedVariables: TValue is used in the ColumnMeta interface
+  interface TableMeta<TData extends RowData> {
+    queryKeys?: QueryKeys;
+  }
+
   interface ColumnMeta<TData extends RowData, TValue> {
     label?: string;
     placeholder?: string;
@@ -11,15 +16,23 @@ declare module "@tanstack/react-table" {
     options?: Option[];
     range?: [number, number];
     unit?: string;
-    icon?: React.FC<React.SVGProps<SVGSVGElement>>;
+    icon?: React.ComponentType<React.ComponentProps<"svg">>;
   }
+}
+
+export interface QueryKeys {
+  page: string;
+  perPage: string;
+  sort: string;
+  filters: string;
+  joinOperator: string;
 }
 
 export interface Option {
   label: string;
   value: string;
   count?: number;
-  icon?: React.FC<React.SVGProps<SVGSVGElement>>;
+  icon?: React.ComponentType<React.ComponentProps<"svg">>;
 }
 
 export type FilterOperator = DataTableConfig["operators"][number];

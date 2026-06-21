@@ -1,41 +1,107 @@
-import { type Parser, parseAsArrayOf, parseAsString } from "nuqs";
+import { createParser } from "nuqs/server";
 import { z } from "zod";
-import type { SortingState } from "@tanstack/react-table";
 
-// Schema for filter items
-export const filterItemSchema = z.object({
+import { dataTableConfig } from "@/config/data-table";
+
+import type {
+  ExtendedColumnFilter,
+  ExtendedColumnSort,
+} from "@/types/data-table";
+
+const sortingItemSchema = z.object({
+  id: z.string(),
+  desc: z.boolean(),
+});
+
+export const getSortingStateParser = <TData>(
+  columnIds?: string[] | Set<string>,
+) => {
+  const validKeys = columnIds
+    ? columnIds instanceof Set
+      ? columnIds
+      : new Set(columnIds)
+    : null;
+
+  return createParser({
+    parse: (value) => {
+      try {
+        const parsed = JSON.parse(value);
+        const result = z.array(sortingItemSchema).safeParse(parsed);
+
+        if (!result.success) return null;
+
+        if (validKeys && result.data.some((item) => !validKeys.has(item.id))) {
+          return null;
+        }
+
+        return result.data as ExtendedColumnSort<TData>[];
+      } catch {
+        return null;
+      }
+    },
+    serialize: (value) => JSON.stringify(value),
+    eq: (a, b) =>
+      a.length === b.length &&
+      a.every(
+        (item, index) =>
+          item.id === b[index]?.id && item.desc === b[index]?.desc,
+      ),
+  });
+};
+
+const filterItemSchema = z.object({
   id: z.string(),
   value: z.union([z.string(), z.array(z.string())]),
+  variant: z.enum(dataTableConfig.filterVariants),
+  operator: z.enum(dataTableConfig.operators),
+  filterId: z.string(),
 });
 
 export type FilterItemSchema = z.infer<typeof filterItemSchema>;
 
-// Parser for sorting state
-export function getSortingStateParser<TData>(
-  columnIds: Set<string>
-) {
-  return parseAsString.withDefault('').withOptions({}).withParse(
-    (value: string): SortingState => {
-      if (!value) return [];
-      
-      try {
-        return value.split(',').map(sortItem => {
-          const [id, direction] = sortItem.split('.');
-          if (!columnIds.has(id)) return null;
-          
-          return {
-            id,
-            desc: direction === 'desc'
-          };
-        }).filter(Boolean) as SortingState;
-      } catch {
-        return [];
-      }
-    }
-  ).withSerialize((value: SortingState): string => {
-    return value.map(sort => `${sort.id}.${sort.desc ? 'desc' : 'asc'}`).join(',');
-  });
-}
+export const getFiltersStateParser = <TData>(
+  columnIds?: string[] | Set<string>,
+) => {
+  const validKeys = columnIds
+    ? columnIds instanceof Set
+      ? columnIds
+      : new Set(columnIds)
+    : null;
 
-// Additional parsers for other data types
-export const parseAsStringArray = parseAsArrayOf(parseAsString, ',');
+  return createParser({
+    parse: (value) => {
+      try {
+        const parsed = JSON.parse(value);
+        const result = z.array(filterItemSchema).safeParse(parsed);
+
+        if (!result.success) return null;
+
+        if (validKeys && result.data.some((item) => !validKeys.has(item.id))) {
+          return null;
+        }
+
+        return result.data as ExtendedColumnFilter<TData>[];
+      } catch {
+        return null;
+      }
+    },
+    serialize: (value) => JSON.stringify(value),
+    eq: (a, b) =>
+      a.length === b.length &&
+      a.every(
+        (filter, index) =>
+          filter.id === b[index]?.id &&
+          filter.value === b[index]?.value &&
+          filter.variant === b[index]?.variant &&
+          filter.operator === b[index]?.operator,
+      ),
+  });
+};
+
+export const parseAsStringArray = createParser({
+  parse: (value: string) => {
+    if (!value) return [];
+    return value.split(",").filter(Boolean);
+  },
+  serialize: (value: string[]) => value.join(","),
+});

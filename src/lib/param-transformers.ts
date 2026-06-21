@@ -181,8 +181,8 @@ export const presets = {
       });
       return params;
     },
-    transformFilters: filterTransformers.withPrefix("filters[") && 
-      ((filters: ColumnFiltersState): Record<string, string> => {
+    transformFilters: 
+      (filters: ColumnFiltersState): Record<string, string> => {
         const params: Record<string, string> = {};
         filters.forEach((filter) => {
           if (filter.value) {
@@ -194,7 +194,7 @@ export const presets = {
           }
         });
         return params;
-      }),
+      },
   },
 
   /** Supabase style */

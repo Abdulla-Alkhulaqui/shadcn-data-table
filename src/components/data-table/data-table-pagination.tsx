@@ -36,10 +36,7 @@ export function DataTablePagination<TData>({
       )}
       {...props}
     >
-      <div className="flex-1 whitespace-nowrap text-muted-foreground text-sm">
-        {table.getFilteredSelectedRowModel().rows.length} of{" "}
-        {table.getFilteredRowModel().rows.length} row(s) selected.
-      </div>
+      {/* Row selection summary is temporarily hidden. */}
       <div className="flex flex-col-reverse items-center gap-4 sm:flex-row sm:gap-6 lg:gap-8">
         <div className="flex items-center space-x-2">
           <p className="whitespace-nowrap font-medium text-sm">Rows per page</p>
@@ -50,7 +47,7 @@ export function DataTablePagination<TData>({
             }}
           >
             <SelectTrigger className="h-8 w-18 data-size:h-8">
-              <SelectValue placeholder={table.getState().pagination.pageSize} />
+              <SelectValue>{table.getState().pagination.pageSize}</SelectValue>
             </SelectTrigger>
             <SelectContent side="top">
               <SelectGroup>

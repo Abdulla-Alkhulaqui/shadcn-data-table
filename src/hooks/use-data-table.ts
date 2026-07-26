@@ -352,6 +352,7 @@ export function useDataTable<TData>(props: UseDataTableProps<TData>) {
     manualFiltering: true,
     meta: {
       ...tableProps.meta,
+      rowNumberOffset: pagination.pageIndex * pagination.pageSize,
       queryKeys: {
         page: pageKey,
         perPage: perPageKey,

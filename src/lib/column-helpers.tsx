@@ -16,6 +16,42 @@ export interface ActionConfig {
 }
 
 /**
+ * Create a row number column. Backend/API tables provide an absolute offset
+ * automatically; other tables fall back to visible-page numbering.
+ */
+export function createRowNumberColumn<TData>(
+  options?: {
+    header?: string;
+    id?: string;
+    startAt?: number;
+    size?: number;
+    className?: string;
+  }
+): ColumnDef<TData> {
+  const {
+    header = "#",
+    id = "row_number",
+    startAt = 1,
+    size = 48,
+    className = "text-sm font-medium text-muted-foreground",
+  } = options || {};
+
+  return {
+    id,
+    header,
+    size,
+    enableSorting: false,
+    enableHiding: false,
+    cell: ({ row, table }) => {
+      const offset = table.options.meta?.rowNumberOffset ?? 0;
+      return (
+        <span className={className}>{offset + row.index + startAt}</span>
+      );
+    },
+  };
+}
+
+/**
  * Create a standard text column with sorting and filtering
  */
 export function createTextColumn<TData>(

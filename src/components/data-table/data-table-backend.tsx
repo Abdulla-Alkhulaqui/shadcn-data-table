@@ -44,10 +44,10 @@ export interface BackendDataTableProps<TData, TValue> {
    */
   renderToolbar?: (
     table: ReactTableInstance<TData>,
-    refetch?: () => void
+    refetch?: () => void,
   ) => React.ReactNode;
   /**
-   * Initial page size (defaults to 25)
+   * Initial page size (defaults to 20)
    */
   initialPageSize?: number;
   /**
@@ -64,13 +64,13 @@ export function BackendDataTable<TData, TValue>({
   loading = false,
   onDataChange,
   renderToolbar,
-  initialPageSize = 25,
+  initialPageSize = 20,
   refetch,
   classes,
 }: BackendDataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] = React.useState({});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
+    [],
   );
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({
@@ -83,7 +83,7 @@ export function BackendDataTable<TData, TValue>({
       setSorting(updater);
       setPagination((current) => ({ ...current, pageIndex: 0 }));
     },
-    []
+    [],
   );
 
   const handleColumnFiltersChange = React.useCallback(
@@ -91,13 +91,16 @@ export function BackendDataTable<TData, TValue>({
       setColumnFilters(updater);
       setPagination((current) => ({ ...current, pageIndex: 0 }));
     },
-    []
+    [],
   );
 
   const table = useReactTable<TData>({
     data,
     columns,
-    pageCount: Math.max(Math.ceil(totalCount / Math.max(pagination.pageSize, 1)), 1),
+    pageCount: Math.max(
+      Math.ceil(totalCount / Math.max(pagination.pageSize, 1)),
+      1,
+    ),
     onSortingChange: handleSortingChange,
     onColumnFiltersChange: handleColumnFiltersChange,
     onColumnVisibilityChange: setColumnVisibility,
@@ -107,6 +110,9 @@ export function BackendDataTable<TData, TValue>({
       columnVisibility,
       columnFilters,
       pagination,
+    },
+    meta: {
+      rowNumberOffset: pagination.pageIndex * pagination.pageSize,
     },
     ...DEFAULT_BACKEND_TABLE_CONFIG,
   });
@@ -141,12 +147,7 @@ export function BackendDataTable<TData, TValue>({
         onDataChangeRef.current(newParams);
       }
     }
-  }, [
-    pagination.pageIndex,
-    pagination.pageSize,
-    sorting,
-    columnFilters,
-  ]);
+  }, [pagination.pageIndex, pagination.pageSize, sorting, columnFilters]);
 
   return (
     <div className={cn("flex flex-col gap-4", classes?.root)}>
@@ -170,7 +171,7 @@ export function BackendDataTable<TData, TValue>({
                       ? null
                       : flexRender(
                           header.column.columnDef.header,
-                          header.getContext()
+                          header.getContext(),
                         )}
                   </TableHead>
                 ))}
@@ -187,7 +188,7 @@ export function BackendDataTable<TData, TValue>({
                     loading ? "opacity-50" : "",
                     typeof classes?.row === "function"
                       ? classes.row(row)
-                      : classes?.row
+                      : classes?.row,
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -196,12 +197,12 @@ export function BackendDataTable<TData, TValue>({
                       className={cn(
                         typeof classes?.cell === "function"
                           ? classes.cell(cell)
-                          : classes?.cell
+                          : classes?.cell,
                       )}
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </TableCell>
                   ))}
@@ -209,7 +210,10 @@ export function BackendDataTable<TData, TValue>({
               ))
             ) : loading ? (
               Array.from({ length: pagination.pageSize }, (_, index) => (
-                <TableRow key={`skeleton-${pagination.pageIndex}-${pagination.pageSize}-${index}`} className={classes?.emptyRow}>
+                <TableRow
+                  key={`skeleton-${pagination.pageIndex}-${pagination.pageSize}-${index}`}
+                  className={classes?.emptyRow}
+                >
                   {columns.map((_, cellIndex) => (
                     <TableCell
                       key={`skeleton-cell-${cellIndex}`}
@@ -234,10 +238,7 @@ export function BackendDataTable<TData, TValue>({
         </Table>
       </div>
 
-      <DataTablePagination
-        table={table}
-        className={classes?.pagination}
-      />
+      <DataTablePagination table={table} className={classes?.pagination} />
     </div>
   );
 }

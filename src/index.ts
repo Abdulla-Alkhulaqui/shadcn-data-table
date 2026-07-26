@@ -69,6 +69,7 @@ export {
   createTextColumn,
   createStatusColumn,
   createDateColumn,
+  createRowNumberColumn,
   createActionsColumn,
   createNumberColumn,
   createBooleanColumn,
